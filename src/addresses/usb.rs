@@ -130,19 +130,19 @@ enum UsbParserState {
     /// Optional, always transition to second.
     Board,
 
-    /// Required, always transition to second.
+    /// Required, always transition to third.
     ManufactuerId,
 
-    /// Required, always transition to third.
+    /// Required, always transition to fourth.
     ModelCode,
 
-    /// Required, always transition to fourth.
+    /// Required, always transition to fifth.
     SerialNumber,
 
-    /// Optional, may trasition to fourth or never be transitioned to is address ends.
+    /// Optional, may trasition to sixth or never be transitioned to is address ends.
     USBInterface,
 
-    /// Optional, may transition to fourth, fifth, of never.
+    /// Optional, may transition to sixth, seventh, of never.
     Instr,
 }
 
@@ -154,9 +154,13 @@ impl FromStr for UsbAddress {
         use UsbParserState::*;
 
         let mut addr_iter = address.char_indices().peekable();
-        let mut buffer = String::with_capacity(10);
-        let mut span = 0..0;
 
+        // Scratch buffer for parsing.
+        let mut buffer = String::with_capacity(10);
+        let mut span = 0..0; // Parsing span. Primarily for errors.
+
+        // I do not like defaults, so I will not implement the Default trait.
+        // but this is an invalid value to build upon.
         let mut ret = Ok(UsbAddress {
             board: None,
             manufactuer_id: 0,
@@ -165,10 +169,17 @@ impl FromStr for UsbAddress {
             interface_number: None,
             instr: false,
         });
-        let mut parser_state = Usb;
+        let mut parser_state = Usb; // WOOO FSM
 
+        // Checking for errors first before advancing the iterator is intentional.
+        // Using the if/else ensures that lifetime analysis is happy. If the iterator
+        // is advanced with the while let, then after it ends we still need to check
+        // what we ended on. Then for error creation the scratch buffer must be moved.
+        // But since we are out of the while loop, lifetime analysis sees that the buffer
+        // moved while in the loop. So it makes a frowny face.
         while let Ok(resource) = &mut ret {
             if let Some((addr_index, addr_char)) = addr_iter.next() {
+                // Span of the section of the address currently being parsed.
                 span.end = addr_index;
 
                 match (&parser_state, addr_char) {
@@ -208,7 +219,11 @@ impl FromStr for UsbAddress {
                         // You are here (no board)
                         resource.board = None;
 
-                        addr_iter.next();
+                        // TODO rust-lang/rust#82775,
+                        // debug_assert_matches!(addr_iter.next(), (_, ':'))
+                        // Or should an error be returned? See: fisa#8
+                        addr_iter.next(); // must be another colon
+
                         span.start = addr_index + 2;
                         buffer.clear();
 
@@ -220,11 +235,15 @@ impl FromStr for UsbAddress {
                         //           ↑
                         // You are here
 
-                        match buffer.parse::<u32>() {
+                        match buffer.parse() {
                             Ok(board_num) => {
                                 resource.board = Some(board_num);
 
+                                // TODO rust-lang/rust#82775,
+                                // debug_assert_matches!(addr_iter.next(), (_, ':'))
+                                // Or should an error be returned? See: fisa#8
                                 addr_iter.next(); // will be two colons I think.
+
                                 span.start = addr_index + 2;
                                 buffer.clear();
 
@@ -251,7 +270,9 @@ impl FromStr for UsbAddress {
                         // Parses hex number
                         match u16::from_str_radix(buffer.as_str(), 16) {
                             Ok(code) => {
-                                // TODO: Once debug_assert_matches!() stabilizes use it here.
+                                // TODO rust-lang/rust#82775,
+                                // debug_assert_matches!(addr_iter.next(), (_, ':'))
+                                // Or should an error be returned? See: fisa#8
                                 addr_iter.next(); // will be two colons.
 
                                 // Advanced to where the start of the modelcode or serialnumber will be.
@@ -350,10 +371,15 @@ impl FromStr for UsbAddress {
                         //                                               ↑          OR          ↑
                         // You are here
 
+                        // Intersting thought. Is it valid for a serial number to have a colon? See fisa#7
                         resource.serial_number.clone_from(&buffer);
                         buffer.clear();
 
-                        addr_iter.next();
+                        // TODO rust-lang/rust#82775,
+                        // debug_assert_matches!(addr_iter.next(), (_, ':'))
+                        // Or should an error be returned? See: fisa#8
+                        addr_iter.next(); // Must be another colon.
+
                         span.start = addr_index + 2;
 
                         // USB interface is optional so peek to see what's next.
@@ -373,6 +399,9 @@ impl FromStr for UsbAddress {
                                 resource.interface_number = Some(num);
                                 buffer.clear();
 
+                                // TODO rust-lang/rust#82775,
+                                // debug_assert_matches!(addr_iter.next(), (_, ':'))
+                                // Or should an error be returned? See: fisa#8
                                 addr_iter.next();
                                 span.start = addr_index + 2;
                                 parser_state = Instr;
@@ -405,7 +434,8 @@ impl FromStr for UsbAddress {
                     }
                 }
             } else {
-                // What happens when the address ends?
+                // When it's the end of the str
+                // Using the if/else ensures that lifetime analysis is happy
                 match parser_state {
                     Usb => {
                         ret = Err(IncompleteAddress(
