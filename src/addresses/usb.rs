@@ -120,6 +120,19 @@ pub enum UsbParseError {
         /// End fo the span containing the invalid "INSTR"
         end: usize,
     },
+
+    /// When the end of a token in the address is detect but is malformed.
+    #[error("Double colons must seperate address portions. Found {found:?} in:\n {addr:?}.")]
+    InvalidSeperator {
+        /// What was found instead of "::"
+        found: String,
+        /// The full invalid address
+        addr: String,
+        /// Start of the span containing the invalid "::"
+        start: usize,
+        /// End fo the span containing the invalid "::"
+        end: usize,
+    },
 }
 
 /// State of the USB address parser state-machine
@@ -213,16 +226,36 @@ impl FromStr for UsbAddress {
                         ret = Err(NotUSB(address[0..3].to_string()));
                         break;
                     }
+                    (ManufactuerId, char)
+                    | (ModelCode, char)
+                    | (SerialNumber, char)
+                    | (Instr, char)
+                        if span.start > span.end =>
+                    {
+                        // USB[board]::manufacturer ID::model code::serial number[::USB interfacenumber][::INSTR]
+                        //            ↑       OR       ↑    OR     ↑      OR       ↑         OR           ↑
+                        // You are here
+
+                        // Since the span of the slice of the address to be analyzed is set
+                        // to be two ahead when the first colon is encounterd, this ensures
+                        // checks to see if the second colon exists.
+                        if char == ':' {
+                            continue;
+                        } else {
+                            ret = Err(InvalidSeperator {
+                                found: format!(":{char}"),
+                                addr: address.to_string(),
+                                start: span.end - 1,
+                                end: span.end,
+                            })
+                        }
+                    }
+                    // Careful! is_empty is true for the above case as well!
                     (Board, ':') if span.is_empty() => {
                         // USB::manufacturer ID::model code::serial number[::USB interfacenumber][::INSTR]
                         //    ↑
                         // You are here (no board)
                         resource.board = None;
-
-                        // TODO rust-lang/rust#82775,
-                        // debug_assert_matches!(addr_iter.next(), (_, ':'))
-                        // Or should an error be returned? See: fisa#8
-                        addr_iter.next(); // must be another colon
 
                         span.start = addr_index + 2;
                         buffer.clear();
@@ -238,11 +271,6 @@ impl FromStr for UsbAddress {
                         match buffer.parse() {
                             Ok(board_num) => {
                                 resource.board = Some(board_num);
-
-                                // TODO rust-lang/rust#82775,
-                                // debug_assert_matches!(addr_iter.next(), (_, ':'))
-                                // Or should an error be returned? See: fisa#8
-                                addr_iter.next(); // will be two colons I think.
 
                                 span.start = addr_index + 2;
                                 buffer.clear();
@@ -270,11 +298,6 @@ impl FromStr for UsbAddress {
                         // Parses hex number
                         match u16::from_str_radix(buffer.as_str(), 16) {
                             Ok(code) => {
-                                // TODO rust-lang/rust#82775,
-                                // debug_assert_matches!(addr_iter.next(), (_, ':'))
-                                // Or should an error be returned? See: fisa#8
-                                addr_iter.next(); // will be two colons.
-
                                 // Advanced to where the start of the modelcode or serialnumber will be.
                                 span.start = addr_index + 2;
                                 buffer.clear();
@@ -375,18 +398,33 @@ impl FromStr for UsbAddress {
                         resource.serial_number.clone_from(&buffer);
                         buffer.clear();
 
-                        // TODO rust-lang/rust#82775,
-                        // debug_assert_matches!(addr_iter.next(), (_, ':'))
-                        // Or should an error be returned? See: fisa#8
-                        addr_iter.next(); // Must be another colon.
-
                         span.start = addr_index + 2;
 
-                        // USB interface is optional so peek to see what's next.
-                        parser_state = match addr_iter.peek() {
-                            Some((_, 'I')) | Some((_, 'i')) => Instr,
-                            _ => USBInterface,
-                        };
+                        // There are two distinct optional fields next
+                        match addr_iter.next() {
+                            Some((i, ':')) => {
+                                parser_state = match addr_iter.peek() {
+                                    Some((_, 'I')) | Some((_, 'i')) => Instr,
+                                    _ => USBInterface,
+                                };
+                                span.end = i + 1;
+                            }
+                            Some((i, char)) => {
+                                ret = Err(InvalidSeperator {
+                                    found: format!(":{char}"),
+                                    addr: address.to_string(),
+                                    start: i - 1,
+                                    end: i,
+                                })
+                            }
+                            None => {
+                                // Means there was one but not a second colon.
+                                ret = Err(IncompleteAddress(
+                                    address.to_string(),
+                                    "either USB Interface or INSTR".to_string(),
+                                ))
+                            }
+                        }
                         continue;
                     }
                     (USBInterface, ':') => {
@@ -399,10 +437,6 @@ impl FromStr for UsbAddress {
                                 resource.interface_number = Some(num);
                                 buffer.clear();
 
-                                // TODO rust-lang/rust#82775,
-                                // debug_assert_matches!(addr_iter.next(), (_, ':'))
-                                // Or should an error be returned? See: fisa#8
-                                addr_iter.next();
                                 span.start = addr_index + 2;
                                 parser_state = Instr;
                                 continue;
@@ -623,5 +657,12 @@ mod test {
         test_ui!(usb_ui_wrong_inst_short, "USB34::0x1234::0x5D78::A22-5::INST", "In address \"INSTR\" was indicated but instead \"INST\" was found at 30 to 32 of\n \"USB34::0x1234::0x5D78::A22-5::INST\"");
         test_ui!(usb_ui_num_err_model, "USB34::0x1234::0x56Z8::A22-5::12314::INSTR", "Found \"56Z8\" instead of a number at position 15 to 20 of \n\"USB34::0x1234::0x56Z8::A22-5::12314::INSTR\"");
         test_ui!(usb_ui_num_err_manu, "USB34::0xTEST::0x568::A22-5::12314::INSTR", "Found \"TEST\" instead of a number at position 7 to 12 of \n\"USB34::0xTEST::0x568::A22-5::12314::INSTR\"");
+        test_ui!(usb_ui_colon, "USB:0x1A34::0x5678::A22-5", "Double colons must seperate address portions. Found \":0\" in:\n \"USB:0x1A34::0x5678::A22-5\".");
+        test_ui!(usb_ui_board_colon, "USB1:0x1A34::0x5678::A22-5", "Double colons must seperate address portions. Found \":0\" in:\n \"USB1:0x1A34::0x5678::A22-5\".");
+        test_ui!(usb_ui_manu_colon, "USB1::0x1A34:0x5678::A22-5", "Double colons must seperate address portions. Found \":0\" in:\n \"USB1::0x1A34:0x5678::A22-5\".");
+        test_ui!(usb_ui_model_colon, "USB1::0x1A34::0x5678:A22-5", "Double colons must seperate address portions. Found \":A\" in:\n \"USB1::0x1A34::0x5678:A22-5\".");
+        test_ui!(usb_ui_serial_colon, "USB1::0x1A34::0x5678::A22-5:01", "Double colons must seperate address portions. Found \":0\" in:\n \"USB1::0x1A34::0x5678::A22-5:01\".");
+        test_ui!(usb_ui_instr_colon, "USB1::0x1A34::0x5678::A22-5::01:INSTR", "Double colons must seperate address portions. Found \":I\" in:\n \"USB1::0x1A34::0x5678::A22-5::01:INSTR\".");
+        test_ui!(usb_ui_instr_colon2, "USB1::0x1A34::0x5678::A22-5:INSTR", "Double colons must seperate address portions. Found \":I\" in:\n \"USB1::0x1A34::0x5678::A22-5:INSTR\".");
     }
 }
