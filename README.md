@@ -1,7 +1,7 @@
 # FISA
 (Ferris Instrument Software Architecture)  
-[![GitHub Actions](https://img.shields.io/github/workflow/status/RossSmyth/fisa/Rust?style=for-the-badge)](https://github.com/RossSmyth/fisa/blob/main/.github/workflows/main.yml)
-[![MPL-2.0](https://img.shields.io/github/license/RossSmyth/fisa?style=for-the-badge)](https://www.mozilla.org/en-US/MPL/2.0/)
+[![GitHub Actions](https://img.shields.io/github/workflow/status/RossSmyth/FISA/CI?style=for-the-badge)](https://github.com/RossSmyth/fisa/blob/main/.github/workflows/main.yml)
+[![MPL-2.0](https://img.shields.io/github/license/RossSmyth/FISA?style=for-the-badge)](https://www.mozilla.org/en-US/MPL/2.0/)
 
 FISA is a Rust library for interfacing with IVI-VISA hardware interfaces. The goal is not to make an IVI-compliant shared library, but rather to let Rust code send and receive VISA messages.
 
