@@ -8,4 +8,4 @@
 //!
 //! Creating a full IVI standard compliant VISA shared library is possible,
 //! that would have to be much further down the line.
-pub mod address;
+pub mod addresses;

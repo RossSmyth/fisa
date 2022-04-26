@@ -1,13 +1,17 @@
 //! Module for parsing VISA ressource addresses.
 //! See Section 4.3.1.1 on page 77 of [this document](https://www.ivifoundation.org/downloads/Architecture%20Specifications/vpp43_2020-11-20.pdf)
-mod usb;
+//! 
+//! All addresses do not rely upon or store the string provided, and they are able to create the address just from the information within them.
+pub mod usb;
 
 use std::{fmt::Display, str::FromStr};
 use thiserror::Error;
 use usb::UsbAddress;
 
+/// The main function for parsing what is what.
 fn parse(addr: &str) -> Result<Address, AddressError> {
     use Address::*;
+    use AddressError::*;
 
     let address = match addr {
         _ if addr.starts_with("VXI") || addr.starts_with("vxi") => todo!(),
@@ -16,7 +20,15 @@ fn parse(addr: &str) -> Result<Address, AddressError> {
         _ if addr.starts_with("TCPIP") || addr.starts_with("tcpip") => todo!(),
         _ if addr.starts_with("USB") || addr.starts_with("usb") => Usb(UsbAddress::from_str(addr)?),
         _ if addr.starts_with("PXI") || addr.starts_with("pxi") => todo!(),
-        _ => panic!(),
+        _ => {
+            return Err(InvalidInterface(
+                if let Some((inter, _)) = addr.split_once(':') {
+                    inter.to_string()
+                } else {
+                    addr.to_string()
+                },
+            ))
+        }
     };
     Ok(address)
 }
@@ -25,6 +37,9 @@ fn parse(addr: &str) -> Result<Address, AddressError> {
 /// This wraps errors propogated from the specific addresses.
 #[derive(Error, Debug)]
 pub enum AddressError {
+    /// If the address does not have a valid interface name.
+    #[error("Invalid VISA interface: {0:?}")]
+    InvalidInterface(String),
     /// Error parsing an address identified as a USB resource.
     #[error(transparent)]
     UsbError(#[from] usb::UsbParseError),
@@ -40,13 +55,43 @@ pub enum Address {
 impl Address {
     /// Constructs new Address object from an address.
     /// Panics on failure.
-    /// Note: Just because parsed does __not__ mean the resource exists.
+    /// 
+    /// > **Note:** Just because parsed does __not__ mean the resource exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use fisa::addresses::Address;
+    /// let addr = "USB::0x1A34::0x5678::A22-5";
+    /// assert_eq!(Address::new(addr).to_string(), addr);
+    /// ```
+    /// 
+    /// ```should_panic
+    /// # use fisa::addresses::Address;
+    /// let addr = "USB::";
+    /// Address::new(addr);
+    /// ```
     pub fn new(address: &str) -> Address {
         Address::try_new(address).unwrap()
     }
     /// Constructs new Address object from an address.
     /// Returns a Result.
     /// Note: Just because parsed does __not__ mean the resource exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use fisa::addresses::{Address, AddressError};
+    /// let addr = "USB::0x1A34::0x5678::A22-5";
+    /// assert_eq!(Address::try_new(addr)?.to_string(), addr);
+    /// # Ok::<(), AddressError>(())
+    /// ```
+    /// 
+    /// ```
+    /// # use fisa::addresses::{Address, AddressError};
+    /// let addr = "USB::";
+    /// assert!(Address::try_new(addr).is_err());
+    /// ```
     pub fn try_new(address: &str) -> Result<Address, AddressError> {
         parse(address)
     }

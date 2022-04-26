@@ -1,3 +1,5 @@
+//! Module for USB VISA addresses.
+//! Includes primarily the main struct and the errors.
 use std::{
     fmt::{Display, Write},
     num::ParseIntError,
@@ -9,28 +11,58 @@ use thiserror::Error;
 /// Represents a USB VISA address
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct UsbAddress {
-    /// The USB
+    /// Not exactly sure
     board: Option<u32>,
     /// The USB manufacturer ID. Always hex in UI.
     manufactuer_id: u16,
     /// The USB model code. Always hex in the UI.
     model_code: u16,
-    /// Serial number. Not actually a number, and a string. For UI purposes only.
+    /// Serial number. Not actually a number, but a string. For UI purposes only and not analyzed.
     serial_number: String,
-    /// Optional interface number. If None, then lowest number is used.
+    /// Optional interface number. If None, then lowest number that matche is used.
     interface_number: Option<u16>,
     /// USB INSTR lets the controller interact with the device associated with the resource.
     instr: bool,
 }
 
 impl UsbAddress {
-    /// Creates a new UsbResource from an address.
+    /// Creates a new UsbAddress from an address.
     /// Panics on failure. See Self::try_new for a Result
+    /// > **Note:** Just because parsed does __not__ mean the resource exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use fisa::addresses::usb::UsbAddress;
+    /// let addr = "USB::0x1A34::0x5678::A22-5";
+    /// assert_eq!(UsbAddress::new(addr).to_string(), addr);
+    /// ```
+    /// 
+    /// ```should_panic
+    /// # use fisa::addresses::usb::UsbAddress;
+    /// let addr = "USB::";
+    /// UsbAddress::new(addr);
+    /// ```
     pub fn new(addr: &str) -> UsbAddress {
         UsbAddress::from_str(addr).unwrap()
     }
 
-    /// Failable creates a new UsbResource from an address.
+    /// Failably creates a new UsbAddress from an address.
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// # use fisa::addresses::usb::{UsbAddress, UsbParseError};
+    /// let addr = "USB::0x1A34::0x5678::A22-5";
+    /// assert_eq!(UsbAddress::try_new(addr)?.to_string(), addr);
+    /// # Ok::<(), UsbParseError>(())
+    /// ```
+    /// 
+    /// ```
+    /// # use fisa::addresses::usb::{UsbAddress, UsbParseError};
+    /// let addr = "USB::";
+    /// assert!(UsbAddress::try_new(addr).is_err());
+    /// ```
     pub fn try_new(addr: &str) -> Result<Self, UsbParseError> {
         UsbAddress::from_str(addr)
     }
@@ -46,10 +78,15 @@ pub enum UsbParseError {
     /// When parsing an integer fails.
     #[error("Found {found:?} instead of a number at position {start:?} to {end:?} of \n{addr:?}")]
     NumParseError {
+        /// What was found instead of a number upon detecting an error.
         found: String,
+        /// The full invalid address.
         addr: String,
+        /// Start index of the address that contains the invalid integer.
         start: usize,
+        /// Final index of the address that contains the invalid integer.
         end: usize,
+        /// The original error returned.
         #[source]
         source: ParseIntError,
     },
@@ -57,22 +94,30 @@ pub enum UsbParseError {
     /// When a field that is supposed to be hexidecimal is not properly formatted.
     #[error("Invalid hexidecimal number: {found:?} at position {start:?} to {end:?} in\n {addr:?}\nNumber must start with '0x'")]
     NotHex {
+        /// What was found instead if "0x"
         found: String,
+        /// The address containing the invalid hex
         addr: String,
+        /// Start of the span that was parsed before the error was detected.
         start: usize,
+        /// End of the span that was parsed before the error was detected.
         end: usize,
     },
 
-    /// When an address is detected to be incomplete
+    /// When an address is detected to not be complete.
     #[error("{0:?} is an incomplete address missing: {1}")]
     IncompleteAddress(String, String),
 
     /// When an address indicates that is has an "INSTR" suffix, but is malformed.
     #[error("In address \"INSTR\" was indicated but instead {found:?} was found at {start:?} to {end:?} of\n {addr:?}")]
     NotInstr {
+        /// What was found instead of "INSTR"
         found: String,
+        /// The full invalid address
         addr: String,
+        /// Start of the span containing the invalid "INSTR"
         start: usize,
+        /// End fo the span containing the invalid "INSTR"
         end: usize,
     },
 }
@@ -191,7 +236,7 @@ impl FromStr for UsbAddress {
                                     found: buffer,
                                     addr: address.to_string(),
                                     start: span.start,
-                                    end: span.end,
+                                    end: span.end - 1,
                                     source: err,
                                 });
                                 break;
@@ -232,7 +277,7 @@ impl FromStr for UsbAddress {
                                     found: buffer,
                                     addr: address.to_string(),
                                     start: span.start,
-                                    end: span.end,
+                                    end: span.end - 1,
                                     source: err,
                                 });
                                 break;
@@ -338,7 +383,7 @@ impl FromStr for UsbAddress {
                                     found: buffer,
                                     addr: address.to_string(),
                                     start: span.start,
-                                    end: span.end,
+                                    end: span.end - 1,
                                     source: err,
                                 });
                                 break;
@@ -406,7 +451,7 @@ impl FromStr for UsbAddress {
                                     found: buffer,
                                     addr: address.to_string(),
                                     start: span.start,
-                                    end: span.end,
+                                    end: span.end - 1,
                                     source: err,
                                 });
                                 break;
@@ -427,7 +472,7 @@ impl FromStr for UsbAddress {
                                 found: buffer,
                                 addr: address.to_string(),
                                 start: span.start,
-                                end: span.end,
+                                end: span.end - 1,
                             })
                         }
                     }
@@ -544,9 +589,9 @@ mod test {
         );
         test_ui!(usb_ui_manu_hex, "USB34::x1H34::0x5678::A22-5::12314::INSTR", "Invalid hexidecimal number: \"x1H34\" at position 7 to 12 in\n \"USB34::x1H34::0x5678::A22-5::12314::INSTR\"\nNumber must start with '0x'");
         test_ui!(usb_ui_model_hex, "USB34::0x1B34::x56A8::A22-5::12314::INSTR", "Invalid hexidecimal number: \"x56A8\" at position 15 to 20 in\n \"USB34::0x1B34::x56A8::A22-5::12314::INSTR\"\nNumber must start with '0x'");
-        test_ui!(usb_ui_wrong_inst_long, "USB34::0x12C4::0x5678::A22-5::12314::INSTRfdss", "In address \"INSTR\" was indicated but instead \"INSTRfdss\" was found at 37 to 45 of\n \"USB34::0x12C4::0x5678::A22-5::12314::INSTRfdss\"");
-        test_ui!(usb_ui_wrong_inst_short, "USB34::0x1234::0x5D78::A22-5::INST", "In address \"INSTR\" was indicated but instead \"INST\" was found at 30 to 33 of\n \"USB34::0x1234::0x5D78::A22-5::INST\"");
-        test_ui!(usb_ui_num_err_model, "USB34::0x1234::0x56Z8::A22-5::12314::INSTR", "Found \"56Z8\" instead of a number at position 15 to 21 of \n\"USB34::0x1234::0x56Z8::A22-5::12314::INSTR\"");
-        test_ui!(usb_ui_num_err_manu, "USB34::0xTEST::0x568::A22-5::12314::INSTR", "Found \"TEST\" instead of a number at position 7 to 13 of \n\"USB34::0xTEST::0x568::A22-5::12314::INSTR\"");
+        test_ui!(usb_ui_wrong_inst_long, "USB34::0x12C4::0x5678::A22-5::12314::INSTRfdss", "In address \"INSTR\" was indicated but instead \"INSTRfdss\" was found at 37 to 44 of\n \"USB34::0x12C4::0x5678::A22-5::12314::INSTRfdss\"");
+        test_ui!(usb_ui_wrong_inst_short, "USB34::0x1234::0x5D78::A22-5::INST", "In address \"INSTR\" was indicated but instead \"INST\" was found at 30 to 32 of\n \"USB34::0x1234::0x5D78::A22-5::INST\"");
+        test_ui!(usb_ui_num_err_model, "USB34::0x1234::0x56Z8::A22-5::12314::INSTR", "Found \"56Z8\" instead of a number at position 15 to 20 of \n\"USB34::0x1234::0x56Z8::A22-5::12314::INSTR\"");
+        test_ui!(usb_ui_num_err_manu, "USB34::0xTEST::0x568::A22-5::12314::INSTR", "Found \"TEST\" instead of a number at position 7 to 12 of \n\"USB34::0xTEST::0x568::A22-5::12314::INSTR\"");
     }
 }
