@@ -1,6 +1,6 @@
 //! Module for parsing VISA ressource addresses.
 //! See Section 4.3.1.1 on page 77 of [this document](https://www.ivifoundation.org/downloads/Architecture%20Specifications/vpp43_2020-11-20.pdf)
-//! 
+//!
 //! All addresses do not rely upon or store the string provided, and they are able to create the address just from the information within them.
 pub mod usb;
 
@@ -55,7 +55,7 @@ pub enum Address {
 impl Address {
     /// Constructs new Address object from an address.
     /// Panics on failure.
-    /// 
+    ///
     /// > **Note:** Just because parsed does __not__ mean the resource exists.
     ///
     /// # Examples
@@ -65,7 +65,7 @@ impl Address {
     /// let addr = "USB::0x1A34::0x5678::A22-5";
     /// assert_eq!(Address::new(addr).to_string(), addr);
     /// ```
-    /// 
+    ///
     /// ```should_panic
     /// # use fisa::addresses::Address;
     /// let addr = "USB::";
@@ -86,7 +86,7 @@ impl Address {
     /// assert_eq!(Address::try_new(addr)?.to_string(), addr);
     /// # Ok::<(), AddressError>(())
     /// ```
-    /// 
+    ///
     /// ```
     /// # use fisa::addresses::{Address, AddressError};
     /// let addr = "USB::";

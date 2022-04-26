@@ -37,7 +37,7 @@ impl UsbAddress {
     /// let addr = "USB::0x1A34::0x5678::A22-5";
     /// assert_eq!(UsbAddress::new(addr).to_string(), addr);
     /// ```
-    /// 
+    ///
     /// ```should_panic
     /// # use fisa::addresses::usb::UsbAddress;
     /// let addr = "USB::";
@@ -48,7 +48,7 @@ impl UsbAddress {
     }
 
     /// Failably creates a new UsbAddress from an address.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -57,7 +57,7 @@ impl UsbAddress {
     /// assert_eq!(UsbAddress::try_new(addr)?.to_string(), addr);
     /// # Ok::<(), UsbParseError>(())
     /// ```
-    /// 
+    ///
     /// ```
     /// # use fisa::addresses::usb::{UsbAddress, UsbParseError};
     /// let addr = "USB::";
