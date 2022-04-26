@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -24,6 +24,19 @@ jobs:
     - run: rustup component add rustfmt
     - run: cargo fmt --all --check
     
+  clippy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - run: rustup update stable && rustup default stable
+    - run: rustup component add clippy
+    - uses: actions-rs/clippy-check@v1
+      with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+
   test:
     runs-on: ${{ matrix.os }}
     env:
