@@ -33,13 +33,13 @@ impl UsbAddress {
     /// # Examples
     ///
     /// ```
-    /// # use fisa::addresses::usb::UsbAddress;
+    /// # use fisa::parse::usb::UsbAddress;
     /// let addr = "USB::0x1A34::0x5678::A22-5";
     /// assert_eq!(UsbAddress::new(addr).to_string(), addr);
     /// ```
     ///
     /// ```should_panic
-    /// # use fisa::addresses::usb::UsbAddress;
+    /// # use fisa::parse::usb::UsbAddress;
     /// let addr = "USB::";
     /// UsbAddress::new(addr);
     /// ```
@@ -52,14 +52,14 @@ impl UsbAddress {
     /// # Examples
     ///
     /// ```
-    /// # use fisa::addresses::usb::{UsbAddress, UsbParseError};
+    /// # use fisa::parse::usb::{UsbAddress, UsbParseError};
     /// let addr = "USB::0x1A34::0x5678::A22-5";
     /// assert_eq!(UsbAddress::try_new(addr)?.to_string(), addr);
     /// # Ok::<(), UsbParseError>(())
     /// ```
     ///
     /// ```
-    /// # use fisa::addresses::usb::{UsbAddress, UsbParseError};
+    /// # use fisa::parse::usb::{UsbAddress, UsbParseError};
     /// let addr = "USB::";
     /// assert!(UsbAddress::try_new(addr).is_err());
     /// ```

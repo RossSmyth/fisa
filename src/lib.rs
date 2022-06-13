@@ -1,11 +1,18 @@
-#![deny(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(
+    unsafe_code,
+    missing_docs,
+    missing_debug_implementations,
+    dead_code,
+    clippy::missing_docs_in_private_items
+)]
+#![warn(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::print_stdout,
+    clippy::cast_sign_loss
+)]
 
-//! Library for interacting with VISA instruments.
-//! Goals:
-//! * Interact with instruments with idiomatic Rust code
-//! * Safety.
-//!
-//! Creating a full IVI standard compliant VISA shared library is possible,
-//! that would have to be much further down the line.
-pub mod addresses;
+#![doc = include_str!("../README.md")]
+
+pub mod parse;
