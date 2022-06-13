@@ -12,7 +12,6 @@
     clippy::print_stdout,
     clippy::cast_sign_loss
 )]
-
 #![doc = include_str!("../README.md")]
 
 pub mod parse;
