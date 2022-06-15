@@ -43,6 +43,7 @@ impl UsbAddress {
     /// let addr = "USB::";
     /// UsbAddress::new(addr);
     /// ```
+    #[inline]
     pub fn new(addr: &str) -> UsbAddress {
         UsbAddress::from_str(addr).unwrap()
     }
@@ -63,6 +64,7 @@ impl UsbAddress {
     /// let addr = "USB::";
     /// assert!(UsbAddress::try_new(addr).is_err());
     /// ```
+    #[inline]
     pub fn try_new(addr: &str) -> Result<Self, UsbParseError> {
         UsbAddress::from_str(addr)
     }
@@ -136,6 +138,10 @@ pub enum UsbParseError {
 }
 
 /// State of the USB address parser state-machine
+///
+/// This always walks forwards, though it may skip
+/// some states. There may be a better way to indicate
+/// that to the compiler but idk. Speed isn't the top priority.
 enum UsbParserState {
     /// Required, the initial state
     Usb,
@@ -162,6 +168,7 @@ enum UsbParserState {
 impl FromStr for UsbAddress {
     type Err = UsbParseError;
 
+    #[inline]
     fn from_str(address: &str) -> Result<Self, Self::Err> {
         use UsbParseError::*;
         use UsbParserState::*;

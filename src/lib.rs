@@ -15,3 +15,10 @@
 #![doc = include_str!("../README.md")]
 
 pub mod parse;
+
+mod sealed {
+    //! Just for sealing traits so no one can be sneaky
+
+    /// How 2 seal traits in one easy step
+    pub trait Sealed {}
+}

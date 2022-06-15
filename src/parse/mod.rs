@@ -4,6 +4,9 @@
 //! All addresses do not rely upon or store the string provided, and they are able to create the address just from the information within them.
 pub mod usb;
 
+mod r#trait;
+pub use r#trait::Address;
+
 // All taken from Table 4.3.2 in
 // https://www.ivifoundation.org/downloads/Architecture%20Specifications/vpp43_2020-11-20.pdf
 
